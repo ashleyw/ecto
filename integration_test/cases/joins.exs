@@ -423,4 +423,27 @@ defmodule Ecto.Integration.JoinsTest do
     assert c1.id == cid1
     assert c2.id == cid2
   end
+
+  test "join fragment with preload" do
+    p1 = TestRepo.insert!(%Post{title: "A"})
+    p2 = TestRepo.insert!(%Post{title: "B"})
+    p3 = TestRepo.insert!(%Post{title: "C"})
+
+    %Comment{id: _} = TestRepo.insert!(%Comment{text: "p1c1", post_id: p1.id})
+    %Comment{id: _} = TestRepo.insert!(%Comment{text: "p1c2", post_id: p1.id})
+    %Comment{id: _} = TestRepo.insert!(%Comment{text: "p2c1", post_id: p2.id})
+    %Comment{id: _} = TestRepo.insert!(%Comment{text: "p3c1", post_id: p3.id})
+
+    query = Post
+      |> join(:inner, [p], c in fragment("SELECT * FROM \"comments\" AS c"), p.id == c.post_id)
+      |> preload([p, c], [comments: c])
+
+    posts = TestRepo.all(query)
+
+    assert posts |> Enum.count == 3
+
+    assert posts |> Enum.map(fn post ->
+      [post.title, Enum.map(post.comments, fn comment -> comment.text end)]
+    end) == [["A", ["p1c1", "p1c2"]], ["B", ["p2c1"]], ["C", ["p3c1"]]]
+  end
 end
